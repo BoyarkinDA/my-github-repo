@@ -1,0 +1,7 @@
+---
+# vars file for vmetrics_install
+
+group_name: victoriametrics
+user_name: victoriametrics
+home_dir: victoriametrics
+service_name: victoriametrics.service

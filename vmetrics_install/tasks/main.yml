@@ -1,0 +1,105 @@
+---
+# tasks file for vmetrics_install
+
+- name: upgrade all packages
+  yum: name=* state=latest
+
+- name: Install mc
+  dnf:
+    pkg: mc
+    state: present
+
+- name: Install jq
+  dnf:
+    pkg: jq
+    state: present
+
+- name: Install curl
+  dnf:
+    pkg: curl
+    state: present
+
+- name: Create Groups
+  group:
+    name: "{{ group_name  }}"
+    state: present
+
+- name: Create Users
+  user:
+    name: "{{ user_name }}"
+    groups: "{{ group_name  }}"
+    append: yes
+    shell: /sbin/nologin
+    home: "/home/{{ home_dir }}"
+
+- name: Download Dist
+  shell:
+    cmd: export VM_VER=`curl -s https://api.github.com/repos/VictoriaMetrics/VictoriaMetrics/releases/latest | jq -r '.tag_name'` && curl -L https://github.com/VictoriaMetrics/VictoriaMetrics/releases/download/${VM_VER}/victoria-metrics-amd64-${VM_VER}.tar.gz --output victoria-metrics-amd64-${VM_VER}.tar.gz
+    chdir: /tmp
+
+- name: Find File
+  find:
+    path: /tmp
+    patterns: "victoria-metrics*"
+    recurse: yes
+    file_type: file
+  register: files
+
+- name: check result
+  debug:
+    var: files.files[0].path
+
+- name: Extract Dist
+  unarchive:
+    src: "{{ item.path }}"
+    dest: /usr/local/bin/
+    remote_src: yes
+  with_items: "{{ files.files }}"
+
+- name: Change owner
+  file:
+    path: /usr/local/bin/victoria-metrics-prod
+    owner: root
+    group: root
+
+- name: Create Folder
+  file:
+    path: /var/lib/victoria-metrics-data
+    state: directory
+
+- name: Change owner
+  file:
+    path: /var/lib/victoria-metrics-data
+    owner: "{{ user_name }}"
+    group: "{{ group_name  }}"
+
+- name: Create service
+  copy:
+    src: victoriametrics.service
+    dest: /etc/systemd/system/
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Enable service victoriametrics.service
+  service:
+    name: "{{ service_name }}"
+    enabled: yes
+
+- name: Start service victoriametrics.service
+  service:
+    name: "{{ service_name }}"
+    state: started
+
+- name: Check if Service Exists
+  stat: path="/etc/systemd/system/{{ service_name }}"
+  register: service_status
+
+- name: Stop Service
+  service: name="{{ service_name }}" state=started
+  when: service_status.stat.exists
+  register: service_started
+
+- name: showing report
+  debug:
+    var: service_started.status.ActiveState

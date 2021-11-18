@@ -1,0 +1,4 @@
+- name: Install Victoria Metrics
+  hosts: ce01
+  roles:
+    - vmetrics_install
